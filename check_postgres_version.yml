@@ -1,0 +1,12 @@
+---
+- name: Check PostgreSQL Server Version
+  hosts: all
+  become: yes
+  tasks:
+    - name: Get PostgreSQL version
+      command: psql --version
+      register: postgres_version
+
+    - name: Show PostgreSQL version
+      debug:
+        msg: "PostgreSQL version: {{ postgres_version.stdout }}"
