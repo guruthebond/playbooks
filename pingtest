@@ -1,0 +1,6 @@
+- hosts: 20.1.0.100
+  vars:
+    ansible_ssh_common_args: '-o ProxyCommand="ssh -W %h:%p -q gtb@10.1.0.11" -o StrictHostKeyChecking=no'
+  tasks:
+    - name: Test connectivity
+      ping:
