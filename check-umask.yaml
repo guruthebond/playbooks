@@ -1,0 +1,12 @@
+---
+- name: Check umask on the server
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Check umask
+      shell: umask
+      register: umask_result
+
+    - name: Display umask
+      debug:
+        msg: "Umask on the server is: {{ umask_result.stdout }}"
