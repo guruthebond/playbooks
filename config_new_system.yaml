@@ -1,0 +1,54 @@
+---
+- name: Configure Hostname and Network
+  hosts: all
+  become: yes
+  vars:
+    dns_server: "10.1.0.100"
+    domain: "gtb.lab"
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - net-tools
+          - git
+          - tar
+        state: present
+        update_cache: yes
+
+    - name: Get the current hostname
+      command: hostname
+      register: current_hostname
+
+    - name: Append domain to hostname
+      set_fact:
+        fqdn: "{{ current_hostname.stdout }}.{{ domain }}"
+
+    - name: Set new hostname
+      hostname:
+        name: "{{ fqdn }}"
+
+    - name: Add new hostname to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        regexp: '127.0.1.1'
+        line: "127.0.1.1 {{ fqdn }} {{ current_hostname.stdout }}"
+
+    - name: Add DNS server to /etc/resolv.conf
+      lineinfile:
+        path: /etc/resolv.conf
+        regexp: '^nameserver'
+        line: "nameserver {{ dns_server }}"
+        insertbefore: BOF
+
+    - name: Get IP address from DNS server
+      shell: |
+        nslookup {{ fqdn }} {{ dns_server }} | grep 'Address:' | tail -n1 | awk '{print $2}'
+      register: resolved_ip
+
+    - name: Set IP address to resolved IP
+      command: ifconfig eth0 {{ resolved_ip.stdout }}
+
+    - name: Reboot the system
+      reboot:
+        reboot_timeout: 600
