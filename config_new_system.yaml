@@ -1,5 +1,5 @@
 ---
-- name: Configure Hostname and Network
+- name: Configure Hostname and Network on Red Hat-based Systems
   hosts: all
   become: yes
   vars:
@@ -8,7 +8,7 @@
 
   tasks:
     - name: Install required packages
-      apt:
+      yum:
         name:
           - net-tools
           - git
@@ -31,8 +31,8 @@
     - name: Add new hostname to /etc/hosts
       lineinfile:
         path: /etc/hosts
-        regexp: '127.0.1.1'
-        line: "127.0.1.1 {{ fqdn }} {{ current_hostname.stdout }}"
+        regexp: '127.0.0.1'
+        line: "127.0.0.1 {{ fqdn }} {{ current_hostname.stdout }}"
 
     - name: Add DNS server to /etc/resolv.conf
       lineinfile:
@@ -47,7 +47,7 @@
       register: resolved_ip
 
     - name: Set IP address to resolved IP
-      command: ifconfig eth0 {{ resolved_ip.stdout }}
+      command: ip addr add {{ resolved_ip.stdout }} dev eth0
 
     - name: Reboot the system
       reboot:
