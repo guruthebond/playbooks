@@ -9,7 +9,7 @@
         username: "{{ lookup('env', 'AWX_USER') }}"
         password: "{{ lookup('env', 'AWX_PASSWORD') }}"
         id: "{{ job_template_id }}"
-        state: "get"
+        state: "present"  # Use "present" to get the details
       register: original_template
 
     - name: Create a copy of the template
