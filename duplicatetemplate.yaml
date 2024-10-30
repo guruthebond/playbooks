@@ -1,0 +1,25 @@
+- name: Duplicate Job Template
+  hosts: localhost
+  tasks:
+    - name: Get the original job template
+      awx.awx.tower_job_template:
+        tower_host: "{{ lookup('env', 'AWX_HOST') }}"
+        username: "{{ lookup('env', 'AWX_USER') }}"
+        password: "{{ lookup('env', 'AWX_PASSWORD') }}"
+        job_template_id: "{{ job_template_id }}"
+        state: "get"
+      register: original_template
+
+    - name: Create a copy of the template
+      awx.awx.tower_job_template:
+        tower_host: "{{ lookup('env', 'AWX_HOST') }}"
+        username: "{{ lookup('env', 'AWX_USER') }}"
+        password: "{{ lookup('env', 'AWX_PASSWORD') }}"
+        name: "{{ original_template.name }} - Copy"
+        job_type: "{{ original_template.job_type }}"
+        inventory: "{{ original_template.inventory }}"
+        project: "{{ original_template.project }}"
+        playbook: "{{ original_template.playbook }}"
+        extra_vars: "{{ original_template.extra_vars }}"
+        credentials: "{{ original_template.credentials }}"
+        state: "present"
