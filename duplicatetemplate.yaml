@@ -4,24 +4,24 @@
     job_template_id: 14  # Replace with the actual ID of the job template to duplicate
   tasks:
     - name: Get the original job template
-      awx.awx.tower_job_template:
+      awx.awx.job_template:
         tower_host: "{{ lookup('env', 'AWX_HOST') }}"
         username: "{{ lookup('env', 'AWX_USER') }}"
         password: "{{ lookup('env', 'AWX_PASSWORD') }}"
-        job_template_id: "{{ job_template_id }}"
+        id: "{{ job_template_id }}"
         state: "get"
       register: original_template
 
     - name: Create a copy of the template
-      awx.awx.tower_job_template:
+      awx.awx.job_template:
         tower_host: "{{ lookup('env', 'AWX_HOST') }}"
         username: "{{ lookup('env', 'AWX_USER') }}"
         password: "{{ lookup('env', 'AWX_PASSWORD') }}"
-        name: "{{ original_template.json.name }} - Copy"
-        job_type: "{{ original_template.json.job_type }}"
-        inventory: "{{ original_template.json.inventory }}"
-        project: "{{ original_template.json.project }}"
-        playbook: "{{ original_template.json.playbook }}"
-        extra_vars: "{{ original_template.json.extra_vars }}"
-        credentials: "{{ original_template.json.credentials }}"
+        name: "{{ original_template.name }} - Copy"
+        job_type: "{{ original_template.job_type }}"
+        inventory: "{{ original_template.inventory }}"
+        project: "{{ original_template.project }}"
+        playbook: "{{ original_template.playbook }}"
+        extra_vars: "{{ original_template.extra_vars }}"
+        credentials: "{{ original_template.credentials }}"
         state: "present"
