@@ -1,0 +1,33 @@
+---
+- name: Check umask on the server
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Check umask
+      shell: umask
+      register: umask_result
+      ignore_errors: yes  # Continue on error
+
+    - name: Display umask
+      debug:
+        msg: "Umask on the server is: {{ umask_result.stdout }}"
+
+    - name: Set email subject and body
+      set_fact:
+        email_subject: "Ansible Job Status: {{ 'SUCCESS' if umask_result is defined and umask_result.rc == 0 else 'FAILED' }}"
+        email_body: |
+          Job Status: {{ 'SUCCESS' if umask_result is defined and umask_result.rc == 0 else 'FAILED' }}
+          Umask Result: {{ umask_result.stdout if umask_result is defined else 'N/A' }}
+          Error Message: {{ umask_result.stderr if umask_result is defined and umask_result.rc != 0 else '' }}
+
+    - name: Send email notification
+      mail:
+        host: "63.136.255.87"  # Replace with your SMTP server
+        port: 25                      # SMTP port 25
+        to: "gurdyal.singh@lumen.com"   # Recipient email address
+        subject: "{{ email_subject }}"
+        body: "{{ email_body }}"
+        subtype: "plain"              # Use plain text for email body
+        # Optionally add sender email
+        from: "no-reply-awx.@lumen.com"  # Sender email address
+      when: umask_result is defined  # Send email only if the umask result is available
