@@ -1,1 +1,24 @@
 
+---
+- name: Aaron webhook template
+  hosts: all
+  vars:
+    postgres_host: "eda-postgres-13.eda.svc.cluster.local"
+    postgres_port: "5432"
+    postgres_user: "postgres"
+    postgres_db: "eda"
+ 
+  sources:
+    - name: Ansible EDA Webhook Source
+      ansible.eda.webhook:
+        port: "{{ port | default(5000) }}"
+        host: localhost
+  rules:
+    - name: Run Aaron Testing Template
+      condition: true
+      action:
+        run_job_template:
+          name: Aaron Testing
+          organization: Managed Services
+        print_event:
+          pretty: true
