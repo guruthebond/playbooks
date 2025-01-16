@@ -9,10 +9,9 @@
           port: 6000
 
   rules:
-      - name: Launch playbook on start command
-        condition: event.payload.command == 'start'
-        action:
-           run_playbook:
-               name: playbook.yml
-               extra_vars:
-                   eventSource: "{{ eventSource }}"  
+    - name: Run Demo Job Template
+      condition: event.payload.message == "Hello EDA"
+      action:
+        run_job_template:
+          name: Demo Job Template
+          organization: Default
