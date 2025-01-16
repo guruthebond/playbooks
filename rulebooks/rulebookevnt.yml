@@ -1,0 +1,16 @@
+---
+- name: Demo Ruleset for Webhook
+  hosts: all
+
+  sources:
+    - ansible.eda.pg_listener:
+        host: 127.0.0.1
+        port: 8000
+
+  rules:
+    - name: Run Demo Job Template
+      condition: event.payload.message == "Hello EDA"
+      action:
+        run_job_template:
+          name: Demo Job Template
+          organization: Default
