@@ -12,5 +12,5 @@
       condition: event.payload.message == "Hello EDA"
       action:
         run_job_template:
-          name: Check Umask
+          name: Demo Job Template
           organization: Default
