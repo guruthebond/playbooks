@@ -1,0 +1,10 @@
+- name: Hello World Sample
+  hosts: all
+tasks:
+  - name: Hello Message
+    debug:
+      msg: "Hello World!"
+    environment:
+      HTTP_PROXY: "http://proxy1.rpod.savvis.net:8080"
+      HTTPS_PROXY: "http://proxy1.rpod.savvis.net:8080"
+      NO_PROXY: "172.23.105.0/24,127.0.0.1,63.136.255.45,localhost,.devicemgmt.infra,sc9iappd02a.devicemgmt.infra,63.136.255.87,intrelay.mgmt.savvis.net,63.136.255.46,sc9iappd02b.devicemgmt.infra,.devicemgmt.infra,.intranet"
