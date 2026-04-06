@@ -1,0 +1,94 @@
+---
+- name: Check Kubernetes certificate expiry and send email
+  hosts: k8s-master
+  gather_facts: no
+
+  vars:
+    expiry_threshold_days: 30
+    email_to: "gurdyal.sngh@lumen.com"
+    email_from: "gurdyal.singh@lumen.com"
+    smtp_server: "smtp1.rpod.savvis.net"
+
+  tasks:
+
+    - name: Run kubeadm certs check-expiration
+      command: kubeadm certs check-expiration
+      register: cert_output
+
+    - name: Extract expiry lines
+      set_fact:
+        cert_lines: "{{ cert_output.stdout_lines | select('search', 'Expires') | list }}"
+
+    - name: Parse expiry dates into structured data
+      set_fact:
+        certs: >-
+          {{
+            cert_lines | map('regex_search',
+              '([A-Za-z0-9_-]+)\\s+([0-9]{4}-[0-9]{2}-[0-9]{2})',
+              '\\1,\\2'
+            ) | list
+          }}
+
+    - name: Build alert list
+      set_fact:
+        expiring: >-
+          {{
+            certs | selectattr(
+              '1',
+              'defined'
+            ) | selectattr(
+              '1',
+              '!=',
+              ''
+            ) | selectattr(
+              '1',
+              'search',
+              '.'
+            ) | select(
+              'match',
+              '.*'
+            ) | map('split', ',') | map('list') | selectattr(
+              1,
+              'search',
+              '.*'
+            ) | map('list') | list
+          }}
+
+    - name: Convert expiry dates to days remaining
+      set_fact:
+        expiring_certs: >-
+          {{
+            expiring | map(
+              'combine',
+              {
+                'name': item.0,
+                'expiry': item.1,
+                'days_left': (
+                  (item.1 | to_datetime) - (ansible_date_time.date | to_datetime)
+                ).days
+              }
+            )
+          }}
+      loop: "{{ expiring }}"
+      loop_control:
+        loop_var: item
+
+    - name: Filter certs below threshold
+      set_fact:
+        alert_list: "{{ expiring_certs | selectattr('days_left', 'lt', expiry_threshold_days) | list }}"
+
+    - name: Send email alert if needed
+      mail:
+        host: "{{ smtp_server }}"
+        to: "{{ email_to }}"
+        from: "{{ email_from }}"
+        subject: "Kubernetes Certificate Expiry Alert"
+        body: |
+          The following Kubernetes certificates are nearing expiry:
+
+          {% for c in alert_list %}
+          - {{ c.name }} expires on {{ c.expiry }} ({{ c.days_left }} days left)
+          {% endfor %}
+
+          Please renew them soon.
+      when: alert_list | length > 0
