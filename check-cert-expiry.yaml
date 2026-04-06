@@ -11,7 +11,7 @@
     expiry_threshold_days: 30
     email_to: "gurdyal.sngh@lumen.com"
     email_from: "gurdyal.singh@lumen.com"
-    smtp_server: "smtp1.rpod.savvis.net"
+    smtp_server: "mailgate.corp.intranet"
 
   tasks:
 
