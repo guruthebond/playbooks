@@ -5,7 +5,7 @@
   become: true
   become_method: sudo
   become_user: root
-  gather_facts: true
+  gather_facts: false
 
   vars:
     expiry_threshold_days: 30
@@ -22,31 +22,21 @@
 
     - name: Initialize certificate list
       set_fact:
-        certs: []
         expiring_certs: []
 
-    - name: Parse kubeadm output into structured list
-      set_fact:
-        certs: "{{ certs + [ {
-          'name': item.split()[0],
-          'expiry': item.split()[1]
-        } ] }}"
-      loop: "{{ cert_output.stdout_lines }}"
-      when:
-        - item is match('^[a-zA-Z]')
-        - item is not search('CERTIFICATE')
-
-    - name: Calculate days remaining for each certificate
+    - name: Extract certificate name and remaining days
       set_fact:
         expiring_certs: "{{ expiring_certs + [ {
-          'name': item.name,
-          'expiry': item.expiry,
-          'days_left': (
-            (item.expiry | to_datetime('%Y-%m-%d')) -
-            (ansible_date_time.date | to_datetime('%Y-%m-%d'))
-          ).days
+          'name': fields[0],
+          'days_left': (fields[3] | regex_replace('d','') | int)
         } ] }}"
-      loop: "{{ certs }}"
+      vars:
+        fields: "{{ item.split() }}"
+      loop: "{{ cert_output.stdout_lines }}"
+      when:
+        - item | regex_search('^[a-zA-Z]')
+        - item is not search('CERTIFICATE')
+        - item.split() | length >= 4
 
     - name: Filter certificates below expiry threshold
       set_fact:
@@ -63,8 +53,8 @@
           (threshold: {{ expiry_threshold_days }} days):
 
           {% for c in alert_list %}
-          - {{ c.name }} expires on {{ c.expiry }} ({{ c.days_left }} days left)
+          - {{ c.name }} ({{ c.days_left }} days remaining)
           {% endfor %}
 
-          Please renew them before expiry.
+          Please renew them in advance.
       when: alert_list | length > 0
