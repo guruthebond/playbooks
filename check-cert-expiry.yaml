@@ -1,6 +1,6 @@
 ---
 - name: Check Kubernetes certificate expiry and send email
-  hosts: k8s-master
+  hosts: all
   gather_facts: no
 
   vars:
