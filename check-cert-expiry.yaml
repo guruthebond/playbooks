@@ -8,7 +8,7 @@
   gather_facts: false
 
   vars:
-    expiry_threshold_days: 30
+    expiry_threshold_days: 300
 
     # SMTP settings (MATCHES your working AWX UI test)
     smtp_server: "mailgate.corp.intranet"
