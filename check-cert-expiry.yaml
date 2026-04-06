@@ -1,7 +1,12 @@
 ---
 - name: Check Kubernetes certificate expiry and send email
   hosts: all
-  gather_facts: no
+  gather_facts: false
+  run_once: true
+  become: true
+  become_method: sudo
+  become_user: root
+
 
   vars:
     expiry_threshold_days: 30
