@@ -1,45 +1,34 @@
 ---
-- name: Test NFS write from AWX execution node
+- name: Test NFS from execution node
   hosts: all
   gather_facts: no
 
-  vars:
-    test_file: "/var/log/awx-jobs/awx-test-{{ inventory_hostname }}.txt"
-
   tasks:
 
-    - name: Show execution node hostname
+    - name: Show execution node
       command: hostname
-      register: node_name
+      delegate_to: localhost
+      run_once: true
+      register: exec_node
 
     - debug:
-        msg: "Running on execution node: {{ node_name.stdout }}"
+        msg: "Execution node is {{ exec_node.stdout }}"
 
-    - name: Check if NFS mount exists
-      stat:
-        path: /var/log/awx-jobs
-      register: nfs_mount
-
-    - debug:
-        var: nfs_mount
-
-    - name: Fail if NFS mount is missing
-      fail:
-        msg: "/var/log/awx-jobs is NOT mounted on execution node"
-      when: not nfs_mount.stat.exists
-
-    - name: Write test file to NFS
+    - name: Write file from execution node
       copy:
         content: |
-          AWX NFS TEST
-          Host: {{ inventory_hostname }}
-          Execution Node: {{ node_name.stdout }}
+          Written from execution node
+          Exec node: {{ exec_node.stdout }}
           Time: {{ lookup('pipe', 'date') }}
-        dest: "{{ test_file }}"
+        dest: "/mnt/awx-logs/awx-test.txt"
+      delegate_to: localhost
+      run_once: true
 
-    - name: Read back the file
-      command: cat "{{ test_file }}"
-      register: file_output
+    - name: Verify file exists
+      command: cat /mnt/awx-logs/awx-test.txt
+      delegate_to: localhost
+      run_once: true
+      register: out
 
     - debug:
-        var: file_output.stdout
+        var: out.stdout
