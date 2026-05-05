@@ -1,46 +1,31 @@
 ---
-- name: Find writable location
+- name: Test NFS mount in EE pod
   hosts: localhost
   gather_facts: false
   
   tasks:
-    - name: Check who we are
-      command: id
-      register: user_id
-      changed_when: false
-    
-    - name: Show user info
-      debug:
-        msg: "{{ user_id.stdout }}"
-    
-    - name: List /var/log
-      command: ls -la /var/log/
-      register: var_log
-      changed_when: false
-    
-    - name: Show /var/log
-      debug:
-        msg: "{{ var_log.stdout_lines }}"
-    
-    - name: Try writing to /tmp
-      shell: echo "Test from AWX job at $(date)" > /tmp/test-from-awx.txt
-      args:
-        executable: /bin/bash
-    
-    - name: Check /tmp write worked
-      command: cat /tmp/test-from-awx.txt
-      register: tmp_test
-    
-    - name: Show /tmp content
-      debug:
-        msg: "{{ tmp_test.stdout }}"
-    
     - name: Check if /var/log/awx-jobs exists
-      command: ls -la /var/log/awx-jobs
-      register: awx_logs_check
+      command: ls -la /var/log/awx-jobs/
+      register: dir_check
       failed_when: false
       changed_when: false
     
-    - name: Show if directory exists
+    - name: Show directory status
       debug:
-        msg: "Directory /var/log/awx-jobs {{ 'exists' if awx_logs_check.rc == 0 else 'does NOT exist' }}"
+        msg: "Directory exists: {{ dir_check.rc == 0 }}"
+    
+    - name: Try to create test file
+      shell: |
+        mkdir -p /var/log/awx-jobs/ee-test
+        echo "EE pod test at $(date)" > /var/log/awx-jobs/ee-test/test.txt
+        echo "Pod name: $HOSTNAME" >> /var/log/awx-jobs/ee-test/test.txt
+        cat /var/log/awx-jobs/ee-test/test.txt
+      args:
+        executable: /bin/bash
+      register: write_test
+      when: dir_check.rc == 0
+    
+    - name: Show result
+      debug:
+        msg: "{{ write_test.stdout_lines }}"
+      when: write_test is defined
