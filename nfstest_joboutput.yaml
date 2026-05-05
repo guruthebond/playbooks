@@ -1,0 +1,70 @@
+---
+- name: Real-time job logging to NFS
+  hosts: localhost
+  gather_facts: false
+  
+  vars:
+    log_file: "/var/log/awx-jobs/job_{{ tower_job_id | default('manual') }}_{{ ansible_date_time.epoch }}.log"
+  
+  tasks:
+    - name: Initialize log file
+      copy:
+        dest: "{{ log_file }}"
+        content: |
+          ========================================
+          Job Started: {{ ansible_date_time.iso8601 }}
+          Job ID: {{ tower_job_id | default('N/A') }}
+          Template: {{ tower_job_template_name | default('N/A') }}
+          User: {{ tower_user_name | default('N/A') }}
+          ========================================
+        mode: '0644'
+    
+    - name: Append task execution to log
+      block:
+        - name: Task 1 - Check system
+          command: uptime
+          register: task1_output
+        
+        - name: Write task 1 output to log
+          lineinfile:
+            path: "{{ log_file }}"
+            line: |
+              [{{ ansible_date_time.time }}] TASK: Check system
+              Output: {{ task1_output.stdout }}
+            insertafter: EOF
+        
+        - name: Task 2 - Check disk
+          command: df -h /
+          register: task2_output
+        
+        - name: Write task 2 output to log
+          lineinfile:
+            path: "{{ log_file }}"
+            line: |
+              [{{ ansible_date_time.time }}] TASK: Check disk
+              Output: {{ task2_output.stdout_lines | join('\n  ') }}
+            insertafter: EOF
+        
+        - name: Task 3 - Your actual work
+          # Replace with your actual tasks
+          debug:
+            msg: "Executing main job tasks"
+          register: main_task
+        
+        - name: Write main task output
+          lineinfile:
+            path: "{{ log_file }}"
+            line: |
+              [{{ ansible_date_time.time }}] TASK: Main job execution
+              Status: {{ main_task.changed | ternary('Changed', 'OK') }}
+            insertafter: EOF
+    
+    - name: Finalize log file
+      lineinfile:
+        path: "{{ log_file }}"
+        line: |
+          ========================================
+          Job Completed: {{ ansible_date_time.iso8601 }}
+          Status: SUCCESS
+          ========================================
+        insertafter: EOF
