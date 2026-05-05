@@ -1,14 +1,21 @@
-- name: Create temp file on execution node
-  copy:
-    content: "hello from {{ inventory_hostname }}"
-    dest: "/tmp/awx-output.txt"
-  delegate_to: localhost
-  run_once: true
+---
+- name: Create and fetch file from execution node
+  hosts: all
+  gather_facts: no
 
-- name: Fetch file to controller
-  fetch:
-    src: "/tmp/awx-output.txt"
-    dest: "/var/lib/awx/projects/"
-    flat: yes
-  delegate_to: localhost
-  run_once: true
+  tasks:
+
+    - name: Create temp file on execution node
+      copy:
+        content: "hello from {{ inventory_hostname }}"
+        dest: "/tmp/awx-output.txt"
+      delegate_to: localhost
+      run_once: true
+
+    - name: Fetch file back to controller project dir
+      fetch:
+        src: "/tmp/awx-output.txt"
+        dest: "/runner/project/"
+        flat: yes
+      delegate_to: localhost
+      run_once: true
