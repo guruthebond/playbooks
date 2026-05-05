@@ -12,4 +12,4 @@
           Inventory Host: {{ inventory_hostname }}
           Job ID: {{ tower_job_id }}
         dest: "/mnt/awx-logs/job-{{ inventory_hostname }}.txt"
-      delegate_to: exe01.gtb.lab
+      delegate_to: 10.1.0.80
