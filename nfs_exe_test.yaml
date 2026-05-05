@@ -1,48 +1,14 @@
----
-- name: Test AWX shared storage (PVC)
-  hosts: all
-  gather_facts: yes
+- name: Create temp file on execution node
+  copy:
+    content: "hello from {{ inventory_hostname }}"
+    dest: "/tmp/awx-output.txt"
+  delegate_to: localhost
+  run_once: true
 
-  vars:
-    log_dir: "/var/log/awx-jobs"
-    test_file: "{{ log_dir }}/awx-test-{{ tower_job_id }}.txt"
-
-  tasks:
-
-    - name: Show execution node
-      debug:
-        msg: "Execution node is {{ ansible_hostname }}"
-      delegate_to: localhost
-      run_once: true
-
-    - name: Ensure log directory exists (on execution container)
-      file:
-        path: "{{ log_dir }}"
-        state: directory
-      delegate_to: localhost
-      run_once: true
-
-    - name: Write test file to shared storage
-      copy:
-        content: |
-          AWX PVC TEST
-          Job ID: {{ tower_job_id }}
-          Execution Node: {{ ansible_hostname }}
-          Inventory Host: {{ inventory_hostname }}
-          Time: {{ ansible_date_time.iso8601 }}
-        dest: "{{ test_file }}"
-      delegate_to: localhost
-      run_once: true
-
-    - name: Verify file content
-      slurp:
-        src: "{{ test_file }}"
-      delegate_to: localhost
-      run_once: true
-      register: file_content
-
-    - name: Print file content
-      debug:
-        msg: "{{ file_content.content | b64decode }}"
-      delegate_to: localhost
-      run_once: true
+- name: Fetch file to controller
+  fetch:
+    src: "/tmp/awx-output.txt"
+    dest: "/var/lib/awx/projects/"
+    flat: yes
+  delegate_to: localhost
+  run_once: true
