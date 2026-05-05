@@ -5,14 +5,13 @@
   
   vars:
     nfs_base_path: "/var/log/awx-jobs"
-    job_id: "{{ tower_job_id | default('manual_' + ansible_date_time.epoch) }}"
-    job_name: "{{ tower_job_template_name | default('unknown_template') }}"
+    job_id: "{{ tower_job_id | default('manual') }}"
+    job_name: "{{ tower_job_template_name | default('unknown') }}"
     job_output_file: "{{ nfs_base_path }}/{{ job_name }}/job_{{ job_id }}_complete_output.txt"
-    job_timestamp: "{{ ansible_date_time.iso8601 }}"
   
   tasks:
     # ============================================
-    # 1. Setup - Create directory structure
+    # 1. Setup - Create directory
     # ============================================
     - name: Create job directory
       file:
@@ -21,149 +20,123 @@
         mode: '0755'
         recurse: yes
     
-    - name: Initialize complete job output file
+    # ============================================
+    # 2. Initialize output file
+    # ============================================
+    - name: Initialize job output
       copy:
         dest: "{{ job_output_file }}"
         content: |
-          ================================================================================
-          AWX JOB OUTPUT
-          ================================================================================
+          ========================================
+          AWX JOB EXECUTION LOG
+          ========================================
           Job ID: {{ job_id }}
           Job Name: {{ job_name }}
-          Template ID: {{ tower_job_template_id | default('N/A') }}
-          User: {{ tower_user_name | default('N/A') }}
-          Start Time: {{ job_timestamp }}
-          Inventory: {{ tower_inventory_name | default('localhost') }}
-          ================================================================================
-          
-    # ============================================
-    # 2. Capture System Information
-    # ============================================
-    - name: Get system info
-      setup:
-        gather_subset:
-          - '!all'
-          - 'min'
-      when: gather_facts|bool
+          User: {{ tower_user_name | default('admin') }}
+          Start Time: {{ ansible_date_time.iso8601 }}
+          ========================================
     
-    - name: Append system information
+    # ============================================
+    # 3. Add system information (simplified)
+    # ============================================
+    - name: Add system info to output
       lineinfile:
         path: "{{ job_output_file }}"
         line: |
           
-          ---------- SYSTEM INFORMATION ----------
-          Hostname: {{ ansible_hostname | default('unknown') }}
-          OS: {{ ansible_distribution | default('unknown') }} {{ ansible_distribution_version | default('') }}
-          Kernel: {{ ansible_kernel | default('unknown') }}
-          Architecture: {{ ansible_architecture | default('unknown') }}
-          CPU Count: {{ ansible_processor_count | default('N/A') }}
-          Memory Total: {{ ansible_memtotal_mb | default('N/A') }} MB
-          ================================================================================
+          --- SYSTEM INFORMATION ---
+          Hostname: {{ ansible_hostname }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Kernel: {{ ansible_kernel }}
+          Architecture: {{ ansible_architecture }}
+          CPU: {{ ansible_processor_cores }} cores
+          Memory: {{ ansible_memtotal_mb }} MB
         insertafter: EOF
     
     # ============================================
-    # 3. Execute Main Playbook Tasks
+    # 4. Execute your main tasks
     # ============================================
     - name: Execute main job tasks
       block:
-        # ========================================
-        # REPLACE THIS SECTION WITH YOUR TASKS
-        # ========================================
-        - name: Task 1 - Check system uptime
+        # ADD YOUR ACTUAL TASKS HERE
+        - name: Example Task 1 - Check uptime
           command: uptime
-          register: uptime_result
+          register: uptime_output
         
-        - name: Append uptime to output
+        - name: Add uptime to output
           lineinfile:
             path: "{{ job_output_file }}"
             line: |
               
-              ---------- TASK: System Uptime ----------
-              {{ uptime_result.stdout }}
+              --- TASK: System Uptime ---
+              {{ uptime_output.stdout }}
             insertafter: EOF
         
-        # Task 2 - Check disk usage
-        - name: Task 2 - Check disk usage
+        - name: Example Task 2 - Check disk space
           command: df -h
-          register: df_result
+          register: df_output
         
-        - name: Append disk usage to output
+        - name: Add disk info to output
           lineinfile:
             path: "{{ job_output_file }}"
             line: |
               
-              ---------- TASK: Disk Usage ----------
-              {{ df_result.stdout }}
+              --- TASK: Disk Usage ---
+              {{ df_output.stdout }}
             insertafter: EOF
         
-        # Task 3 - Your custom task
-        - name: Task 3 - Your custom application task
-          # Replace this with your actual task
+        # YOUR CUSTOM TASKS GO HERE
+        - name: Your custom task
           debug:
-            msg: "Executing custom application logic"
-          register: custom_task
+            msg: "Executing custom job logic"
+          register: custom_output
         
-        - name: Append custom task output
+        - name: Add custom task output
           lineinfile:
             path: "{{ job_output_file }}"
             line: |
               
-              ---------- TASK: Custom Application ----------
-              {{ custom_task.msg }}
+              --- TASK: Custom Job Logic ---
+              {{ custom_output.msg }}
             insertafter: EOF
         
-        # ========================================
-        # END OF YOUR TASKS
-        # ========================================
-        
-        # Mark job as successful
-        - name: Set success flag
+        - name: Set success status
           set_fact:
             job_status: "SUCCESS"
-            job_end_time: "{{ ansible_date_time.iso8601 }}"
       
-      # ============================================
-      # 4. Handle Failures
-      # ============================================
       rescue:
-        - name: Set failure flag
+        - name: Set failure status
           set_fact:
             job_status: "FAILED"
-            job_end_time: "{{ ansible_date_time.iso8601 }}"
-            job_error: "{{ ansible_failed_result.msg | default('Unknown error') }}"
+            error_msg: "{{ ansible_failed_result.msg | default('Unknown error') }}"
         
-        - name: Append error to output
+        - name: Add error to output
           lineinfile:
             path: "{{ job_output_file }}"
             line: |
               
-              ---------- ERROR ----------
-              Job FAILED at {{ job_end_time }}
-              Error: {{ job_error }}
-              ================================================================================
+              --- JOB FAILED ---
+              Error: {{ error_msg }}
             insertafter: EOF
-      
-      # ============================================
-      # 5. Always Run - Finalize Output
-      # ============================================
-      always:
-        - name: Finalize job output
-          lineinfile:
-            path: "{{ job_output_file }}"
-            line: |
-              
-              ================================================================================
-              JOB COMPLETED
-              ================================================================================
-              Status: {{ job_status | default('UNKNOWN') }}
-              End Time: {{ job_end_time | default(ansible_date_time.iso8601) }}
-              Duration: {{ (job_end_time | default(ansible_date_time.iso8601) | to_datetime('%Y-%m-%dT%H:%M:%SZ') - job_timestamp | to_datetime('%Y-%m-%dT%H:%M:%SZ')).seconds if job_end_time is defined else 'N/A' }} seconds
-              Output File: {{ job_output_file }}
-              ================================================================================
-            insertbefore: EOF
     
     # ============================================
-    # 6. Create Additional Artifacts
+    # 5. Finalize output
+    # ============================================
+    - name: Finalize job output
+      lineinfile:
+        path: "{{ job_output_file }}"
+        line: |
+          
+          ========================================
+          JOB COMPLETED
+          ========================================
+          Status: {{ job_status | default('SUCCESS') }}
+          End Time: {{ ansible_date_time.iso8601 }}
+          ========================================
+        insertafter: EOF
+    
+    # ============================================
+    # 6. Create summary file
     # ============================================
     - name: Create JSON summary
       copy:
@@ -172,37 +145,15 @@
           {
             "job_id": "{{ job_id }}",
             "job_name": "{{ job_name }}",
-            "status": "{{ job_status }}",
-            "start_time": "{{ job_timestamp }}",
-            "end_time": "{{ job_end_time }}",
-            "user": "{{ tower_user_name | default('N/A') }}",
+            "status": "{{ job_status | default('SUCCESS') }}",
+            "start_time": "{{ ansible_date_time.iso8601 }}",
+            "user": "{{ tower_user_name | default('admin') }}",
             "output_file": "job_{{ job_id }}_complete_output.txt"
           }
     
-    - name: Create symlink to latest job
+    - name: Create latest symlink
       file:
         src: "{{ job_output_file }}"
-        dest: "{{ nfs_base_path }}/{{ job_name }}/latest_output.txt"
+        dest: "{{ nfs_base_path }}/{{ job_name }}/latest.txt"
         state: link
         force: yes
-    
-    - name: Create master job log (append mode)
-      lineinfile:
-        path: "{{ nfs_base_path }}/{{ job_name }}/master_job_log.txt"
-        line: "{{ job_timestamp }} | Job {{ job_id }} | Status: {{ job_status }} | Output: job_{{ job_id }}_complete_output.txt"
-        create: yes
-    
-    # ============================================
-    # 7. Show Summary
-    # ============================================
-    - name: Display job summary
-      debug:
-        msg: |
-          ====================================
-          JOB COMPLETED
-          ====================================
-          Job ID: {{ job_id }}
-          Status: {{ job_status }}
-          Output saved to: {{ job_output_file }}
-          Summary saved to: {{ nfs_base_path }}/{{ job_name }}/job_{{ job_id }}_summary.json
-          ====================================
