@@ -1,0 +1,45 @@
+---
+- name: Test NFS write from AWX execution node
+  hosts: all
+  gather_facts: no
+
+  vars:
+    test_file: "/mnt/awx-logs/awx-test-{{ inventory_hostname }}.txt"
+
+  tasks:
+
+    - name: Show execution node hostname
+      command: hostname
+      register: node_name
+
+    - debug:
+        msg: "Running on execution node: {{ node_name.stdout }}"
+
+    - name: Check if NFS mount exists
+      stat:
+        path: /mnt/awx-logs
+      register: nfs_mount
+
+    - debug:
+        var: nfs_mount
+
+    - name: Fail if NFS mount is missing
+      fail:
+        msg: "/mnt/awx-logs is NOT mounted on execution node"
+      when: not nfs_mount.stat.exists
+
+    - name: Write test file to NFS
+      copy:
+        content: |
+          AWX NFS TEST
+          Host: {{ inventory_hostname }}
+          Execution Node: {{ node_name.stdout }}
+          Time: {{ lookup('pipe', 'date') }}
+        dest: "{{ test_file }}"
+
+    - name: Read back the file
+      command: cat "{{ test_file }}"
+      register: file_output
+
+    - debug:
+        var: file_output.stdout
