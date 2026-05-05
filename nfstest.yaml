@@ -1,31 +1,26 @@
 ---
-- name: Test NFS mount in EE pod
+- name: Long running test for debugging
   hosts: localhost
   gather_facts: false
   
   tasks:
-    - name: Check if /var/log/awx-jobs exists
-      command: ls -la /var/log/awx-jobs/
-      register: dir_check
-      failed_when: false
-      changed_when: false
-    
-    - name: Show directory status
+    - name: Debug - show pod info
       debug:
-        msg: "Directory exists: {{ dir_check.rc == 0 }}"
+        msg: "Starting debug job on {{ ansible_date_time.iso8601 }}"
     
-    - name: Try to create test file
+    - name: Wait for manual inspection
+      pause:
+        minutes: 2
+    
+    - name: Try to create NFS directory
       shell: |
-        mkdir -p /var/log/awx-jobs/ee-test
-        echo "EE pod test at $(date)" > /var/log/awx-jobs/ee-test/test.txt
-        echo "Pod name: $HOSTNAME" >> /var/log/awx-jobs/ee-test/test.txt
-        cat /var/log/awx-jobs/ee-test/test.txt
+        mkdir -p /var/log/awx-jobs
+        echo "Test from EE worker at $(date)" > /var/log/awx-jobs/worker-test.txt
+        cat /var/log/awx-jobs/worker-test.txt
       args:
         executable: /bin/bash
-      register: write_test
-      when: dir_check.rc == 0
+      register: result
     
     - name: Show result
       debug:
-        msg: "{{ write_test.stdout_lines }}"
-      when: write_test is defined
+        msg: "{{ result.stdout_lines }}"
