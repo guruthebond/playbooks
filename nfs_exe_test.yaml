@@ -1,34 +1,32 @@
 ---
 - name: Test NFS from execution node
   hosts: all
-  gather_facts: no
+  gather_facts: yes
 
   tasks:
 
     - name: Show execution node
-      command: hostname
+      debug:
+        msg: "Execution node is {{ ansible_hostname }}"
       delegate_to: localhost
       run_once: true
-      register: exec_node
-
-    - debug:
-        msg: "Execution node is {{ exec_node.stdout }}"
 
     - name: Write file from execution node
       copy:
         content: |
           Written from execution node
-          Exec node: {{ exec_node.stdout }}
-          Time: {{ lookup('pipe', 'date') }}
+          Exec node: {{ ansible_hostname }}
+          Time: {{ ansible_date_time.iso8601 }}
         dest: "/mnt/awx-logs/awx-test.txt"
       delegate_to: localhost
       run_once: true
 
-    - name: Verify file exists
-      command: cat /mnt/awx-logs/awx-test.txt
+    - name: Read file back
+      slurp:
+        src: "/mnt/awx-logs/awx-test.txt"
       delegate_to: localhost
       run_once: true
-      register: out
+      register: file_content
 
     - debug:
-        var: out.stdout
+        msg: "{{ file_content.content | b64decode }}"
