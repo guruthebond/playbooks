@@ -1,5 +1,5 @@
 ---
-- name: Capture and send logs to NFS
+- name: Single aggregated log
   hosts: all
   gather_facts: no
 
@@ -9,14 +9,16 @@
       shell: hostname
       register: result
 
-    - name: Write per-host output to NFS
+    - name: Store result per host
+      set_fact:
+        host_output: "{{ result.stdout }}"
+
+    - name: Write combined log
       copy:
         content: |
-          =========================
-          AWX JOB OUTPUT
-          Job ID: {{ tower_job_id }}
-          Host: {{ inventory_hostname }}
-          Output: {{ result.stdout }}
-          =========================
-        dest: "/mnt/awx-logs/job-{{ tower_job_id }}-{{ inventory_hostname }}.log"
+          {% for h in ansible_play_hosts %}
+          {{ h }}: {{ hostvars[h].host_output }}
+          {% endfor %}
+        dest: "/mnt/awx-logs/job-{{ tower_job_id }}.log"
       delegate_to: 10.1.0.80
+      run_once: true
