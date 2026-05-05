@@ -1,96 +1,13 @@
 ---
-- name: Structured job logging to NFS
+- name: Basic NFS write test
   hosts: localhost
-  gather_facts: true
-  
-  vars:
-    job_output_dir: "/var/log/awx-jobs/structured"
-    job_id: "{{ tower_job_id | default('manual_' + ansible_date_time.epoch) }}"
+  gather_facts: false
   
   tasks:
-    - name: Create job directory
-      file:
-        path: "{{ job_output_dir }}/{{ job_id }}"
-        state: directory
-        mode: '0755'
-        recurse: yes
-    
-    - name: Save job metadata
+    - name: Write timestamp to NFS
       copy:
-        dest: "{{ job_output_dir }}/{{ job_id }}/metadata.json"
         content: |
-          {{ {
-            "job_id": job_id,
-            "job_name": tower_job_template_name | default('unknown'),
-            "start_time": ansible_date_time.iso8601,
-            "user": tower_user_name | default('unknown'),
-            "host": inventory_hostname,
-            "playbook": "job_output_to_nfs.yml"
-          } | to_nice_json }}
-    
-    - name: Execute main playbook tasks
-      block:
-        - name: Your main application tasks
-          # Replace this block with your actual tasks
-          debug:
-            msg: "Running main job tasks"
-          register: main_results
-        
-        - name: Collect task results
-          set_fact:
-            task_results: "{{ task_results | default([]) + [{'task': 'main_execution', 'output': main_results.msg, 'timestamp': ansible_date_time.iso8601}] }}"
-      
-        - name: Another example task
-          command: "echo 'Processing data...'"
-          register: data_processing
-        
-        - name: Collect data processing results
-          set_fact:
-            task_results: "{{ task_results + [{'task': 'data_processing', 'output': data_processing.stdout, 'timestamp': ansible_date_time.iso8601}] }}"
-    
-    - name: Save task results
-      copy:
-        dest: "{{ job_output_dir }}/{{ job_id }}/results.json"
-        content: "{{ task_results | to_nice_json }}"
-    
-    - name: Generate summary report
-      template:
-        src: job_summary.j2
-        dest: "{{ job_output_dir }}/{{ job_id }}/summary.html"
-      vars:
-        job_summary: |
-          <html>
-          <head><title>Job {{ job_id }} Summary</title></head>
-          <body>
-          <h1>Job Execution Summary</h1>
-          <p><strong>Job ID:</strong> {{ job_id }}</p>
-          <p><strong>Template:</strong> {{ tower_job_template_name | default('N/A') }}</p>
-          <p><strong>Start Time:</strong> {{ ansible_date_time.iso8601 }}</p>
-          <p><strong>Status:</strong> SUCCESS</p>
-          <h2>Task Results</h2>
-          <ul>
-          {% for result in task_results %}
-            <li><strong>{{ result.timestamp }}</strong> - {{ result.task }}: {{ result.output }}</li>
-          {% endfor %}
-          </ul>
-          </body>
-          </html>
-      no_log: true
-    
-    - name: Create latest symlink
-      file:
-        src: "{{ job_output_dir }}/{{ job_id }}"
-        dest: "{{ job_output_dir }}/latest"
-        state: link
-        force: yes
-
-  always:
-    - name: Update final status
-      copy:
-        dest: "{{ job_output_dir }}/{{ job_id }}/status.json"
-        content: |
-          {
-            "status": "completed",
-            "end_time": "{{ ansible_date_time.iso8601 }}",
-            "output_dir": "{{ job_output_dir }}/{{ job_id }}"
-          }
+          Job ID: {{ tower_job_id | default('test') }}
+          Time: {{ ansible_date_time.iso8601 }}
+          Status: Test successful
+        dest: "/var/log/awx-jobs/test_{{ tower_job_id | default('manual') }}.txt"
