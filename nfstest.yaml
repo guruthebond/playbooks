@@ -1,45 +1,22 @@
 ---
-- name: Test write to AWX NFS mount
+- name: Simple NFS write test
   hosts: localhost
   gather_facts: false
-
-  vars:
-    output_dir: "/var/log/awx-jobs/custom"
-
+  
   tasks:
-    - name: Check current user and permissions
-      command: whoami
-      register: current_user
-      changed_when: false
+    - name: Write test file using shell
+      shell: |
+        mkdir -p /var/log/awx-jobs/custom
+        echo "Test from AWX at $(date)" > /var/log/awx-jobs/custom/test.txt
+        echo "Job ID: {{ tower_job_id | default('N/A') }}" >> /var/log/awx-jobs/custom/test.txt
+        echo "User: $(whoami)" >> /var/log/awx-jobs/custom/test.txt
+        echo "UID: $(id -u)" >> /var/log/awx-jobs/custom/test.txt
+        echo "Success!" >> /var/log/awx-jobs/custom/test.txt
+        cat /var/log/awx-jobs/custom/test.txt
+      args:
+        executable: /bin/bash
+      register: result
 
-    - name: Display current user
+    - name: Show output
       debug:
-        msg: "Running as user: {{ current_user.stdout }}"
-
-    - name: Create custom directory (not the parent)
-      file:
-        path: "{{ output_dir }}"
-        state: directory
-        mode: '0755'
-
-    - name: Write test file to NFS
-      copy:
-        dest: "{{ output_dir }}/job_{{ tower_job_id | default('manual') }}.txt"
-        content: |
-          ===== AWX NFS TEST =====
-          Job ID: {{ tower_job_id | default('N/A') }}
-          Template: {{ tower_job_template_name | default('N/A') }}
-          User: {{ tower_user_name | default('N/A') }}
-          Time: {{ lookup('pipe', 'date') }}
-          Host: {{ inventory_hostname }}
-        mode: '0644'
-
-    - name: Verify file exists
-      stat:
-        path: "{{ output_dir }}/job_{{ tower_job_id | default('manual') }}.txt"
-      register: file_check
-
-    - name: Show result
-      debug:
-        msg: "File created successfully at {{ output_dir }}"
-      when: file_check.stat.exists
+        msg: "{{ result.stdout_lines }}"
