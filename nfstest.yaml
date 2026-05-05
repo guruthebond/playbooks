@@ -4,13 +4,17 @@
   gather_facts: false
   
   tasks:
-    - name: Debug - show pod info
-      debug:
-        msg: "Starting debug job on {{ ansible_date_time.iso8601 }}"
+    - name: Debug - show start time
+      command: date
+      register: start_time
     
-    - name: Wait for manual inspection
+    - name: Show start time
+      debug:
+        msg: "Starting debug job at {{ start_time.stdout }}"
+    
+    - name: Wait for manual inspection (60 seconds)
       pause:
-        minutes: 2
+        seconds: 60
     
     - name: Try to create NFS directory
       shell: |
