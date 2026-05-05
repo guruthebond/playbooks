@@ -22,18 +22,25 @@
       debug:
         msg: "{{ var_log.stdout_lines }}"
     
-    - name: Try writing to /tmp first
-      copy:
-        content: "Test from AWX job at {{ ansible_date_time.iso8601 }}"
-        dest: /tmp/test-from-awx.txt
+    - name: Try writing to /tmp
+      shell: echo "Test from AWX job at $(date)" > /tmp/test-from-awx.txt
+      args:
+        executable: /bin/bash
     
-    - name: Try writing to /var/log/awx-jobs
-      copy:
-        content: "Test to awx-jobs"
-        dest: /var/log/awx-jobs/test.txt
-      ignore_errors: yes
-      register: test_write
+    - name: Check /tmp write worked
+      command: cat /tmp/test-from-awx.txt
+      register: tmp_test
     
-    - name: Check if write succeeded
+    - name: Show /tmp content
       debug:
-        msg: "Write to /var/log/awx-jobs {{ 'succeeded' if test_write is not failed else 'failed' }}"
+        msg: "{{ tmp_test.stdout }}"
+    
+    - name: Check if /var/log/awx-jobs exists
+      command: ls -la /var/log/awx-jobs
+      register: awx_logs_check
+      failed_when: false
+      changed_when: false
+    
+    - name: Show if directory exists
+      debug:
+        msg: "Directory /var/log/awx-jobs {{ 'exists' if awx_logs_check.rc == 0 else 'does NOT exist' }}"
