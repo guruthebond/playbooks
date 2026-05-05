@@ -1,70 +1,96 @@
 ---
-- name: Real-time job logging to NFS
+- name: Structured job logging to NFS
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
   
   vars:
-    log_file: "/var/log/awx-jobs/job_{{ tower_job_id | default('manual') }}_{{ ansible_date_time.epoch }}.log"
+    job_output_dir: "/var/log/awx-jobs/structured"
+    job_id: "{{ tower_job_id | default('manual_' + ansible_date_time.epoch) }}"
   
   tasks:
-    - name: Initialize log file
+    - name: Create job directory
+      file:
+        path: "{{ job_output_dir }}/{{ job_id }}"
+        state: directory
+        mode: '0755'
+        recurse: yes
+    
+    - name: Save job metadata
       copy:
-        dest: "{{ log_file }}"
+        dest: "{{ job_output_dir }}/{{ job_id }}/metadata.json"
         content: |
-          ========================================
-          Job Started: {{ ansible_date_time.iso8601 }}
-          Job ID: {{ tower_job_id | default('N/A') }}
-          Template: {{ tower_job_template_name | default('N/A') }}
-          User: {{ tower_user_name | default('N/A') }}
-          ========================================
-        mode: '0644'
+          {{ {
+            "job_id": job_id,
+            "job_name": tower_job_template_name | default('unknown'),
+            "start_time": ansible_date_time.iso8601,
+            "user": tower_user_name | default('unknown'),
+            "host": inventory_hostname,
+            "playbook": "job_output_to_nfs.yml"
+          } | to_nice_json }}
     
-    - name: Append task execution to log
+    - name: Execute main playbook tasks
       block:
-        - name: Task 1 - Check system
-          command: uptime
-          register: task1_output
-        
-        - name: Write task 1 output to log
-          lineinfile:
-            path: "{{ log_file }}"
-            line: |
-              [{{ ansible_date_time.time }}] TASK: Check system
-              Output: {{ task1_output.stdout }}
-            insertafter: EOF
-        
-        - name: Task 2 - Check disk
-          command: df -h /
-          register: task2_output
-        
-        - name: Write task 2 output to log
-          lineinfile:
-            path: "{{ log_file }}"
-            line: |
-              [{{ ansible_date_time.time }}] TASK: Check disk
-              Output: {{ task2_output.stdout_lines | join('\n  ') }}
-            insertafter: EOF
-        
-        - name: Task 3 - Your actual work
-          # Replace with your actual tasks
+        - name: Your main application tasks
+          # Replace this block with your actual tasks
           debug:
-            msg: "Executing main job tasks"
-          register: main_task
+            msg: "Running main job tasks"
+          register: main_results
         
-        - name: Write main task output
-          lineinfile:
-            path: "{{ log_file }}"
-            line: |
-              [{{ ansible_date_time.time }}] TASK: Main job execution
-              Status: {{ main_task.changed | ternary('Changed', 'OK') }}
-            insertafter: EOF
+        - name: Collect task results
+          set_fact:
+            task_results: "{{ task_results | default([]) + [{'task': 'main_execution', 'output': main_results.msg, 'timestamp': ansible_date_time.iso8601}] }}"
+      
+        - name: Another example task
+          command: "echo 'Processing data...'"
+          register: data_processing
+        
+        - name: Collect data processing results
+          set_fact:
+            task_results: "{{ task_results + [{'task': 'data_processing', 'output': data_processing.stdout, 'timestamp': ansible_date_time.iso8601}] }}"
     
-    - name: Finalize log file
-      lineinfile:
-        path: "{{ log_file }}"
-        line: |
-          ========================================
-          Job Completed: {{ ansible_date_time.iso8601 }}
-          Status: SUCCESS
-          ========================================
-        insertafter: EOF
+    - name: Save task results
+      copy:
+        dest: "{{ job_output_dir }}/{{ job_id }}/results.json"
+        content: "{{ task_results | to_nice_json }}"
+    
+    - name: Generate summary report
+      template:
+        src: job_summary.j2
+        dest: "{{ job_output_dir }}/{{ job_id }}/summary.html"
+      vars:
+        job_summary: |
+          <html>
+          <head><title>Job {{ job_id }} Summary</title></head>
+          <body>
+          <h1>Job Execution Summary</h1>
+          <p><strong>Job ID:</strong> {{ job_id }}</p>
+          <p><strong>Template:</strong> {{ tower_job_template_name | default('N/A') }}</p>
+          <p><strong>Start Time:</strong> {{ ansible_date_time.iso8601 }}</p>
+          <p><strong>Status:</strong> SUCCESS</p>
+          <h2>Task Results</h2>
+          <ul>
+          {% for result in task_results %}
+            <li><strong>{{ result.timestamp }}</strong> - {{ result.task }}: {{ result.output }}</li>
+          {% endfor %}
+          </ul>
+          </body>
+          </html>
+      no_log: true
+    
+    - name: Create latest symlink
+      file:
+        src: "{{ job_output_dir }}/{{ job_id }}"
+        dest: "{{ job_output_dir }}/latest"
+        state: link
+        force: yes
+
+  always:
+    - name: Update final status
+      copy:
+        dest: "{{ job_output_dir }}/{{ job_id }}/status.json"
+        content: |
+          {
+            "status": "completed",
+            "end_time": "{{ ansible_date_time.iso8601 }}",
+            "output_dir": "{{ job_output_dir }}/{{ job_id }}"
+          }
