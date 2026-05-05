@@ -1,7 +1,7 @@
 ---
 - name: Basic NFS write test
   hosts: localhost
-  gather_facts: false
+  gather_facts: yes
   
   tasks:
     - name: Write timestamp to NFS
