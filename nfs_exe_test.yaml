@@ -1,21 +1,37 @@
 ---
-- name: Create and fetch file from execution node
+- name: Write directly to NFS
   hosts: all
+  become: yes
   gather_facts: no
 
   tasks:
 
-    - name: Create temp file on execution node
-      copy:
-        content: "hello from {{ inventory_hostname }}"
-        dest: "/tmp/awx-output.txt"
+    - name: Install NFS client (if missing)
+      package:
+        name: nfs-utils
+        state: present
       delegate_to: localhost
       run_once: true
 
-    - name: Fetch file back to controller project dir
-      fetch:
-        src: "/tmp/awx-output.txt"
-        dest: "/runner/project/"
-        flat: yes
+    - name: Create mount point
+      file:
+        path: /mnt/nfs
+        state: directory
+      delegate_to: localhost
+      run_once: true
+
+    - name: Mount NFS share
+      mount:
+        path: /mnt/nfs
+        src: 10.1.0.100:/home/gtb/share_dir
+        fstype: nfs
+        state: mounted
+      delegate_to: localhost
+      run_once: true
+
+    - name: Write file to NFS
+      copy:
+        content: "Hello from AWX job {{ inventory_hostname }}"
+        dest: "/mnt/nfs/job-{{ inventory_hostname }}.txt"
       delegate_to: localhost
       run_once: true
