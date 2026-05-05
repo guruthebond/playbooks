@@ -1,7 +1,11 @@
 ---
-- name: Test NFS from execution node
+- name: Test AWX shared storage (PVC)
   hosts: all
   gather_facts: yes
+
+  vars:
+    log_dir: "/var/log/awx-jobs"
+    test_file: "{{ log_dir }}/awx-test-{{ tower_job_id }}.txt"
 
   tasks:
 
@@ -11,22 +15,34 @@
       delegate_to: localhost
       run_once: true
 
-    - name: Write file from execution node
-      copy:
-        content: |
-          Written from execution node
-          Exec node: {{ ansible_hostname }}
-          Time: {{ ansible_date_time.iso8601 }}
-        dest: "/mnt/awx-logs/awx-test.txt"
+    - name: Ensure log directory exists (on execution container)
+      file:
+        path: "{{ log_dir }}"
+        state: directory
       delegate_to: localhost
       run_once: true
 
-    - name: Read file back
+    - name: Write test file to shared storage
+      copy:
+        content: |
+          AWX PVC TEST
+          Job ID: {{ tower_job_id }}
+          Execution Node: {{ ansible_hostname }}
+          Inventory Host: {{ inventory_hostname }}
+          Time: {{ ansible_date_time.iso8601 }}
+        dest: "{{ test_file }}"
+      delegate_to: localhost
+      run_once: true
+
+    - name: Verify file content
       slurp:
-        src: "/mnt/awx-logs/awx-test.txt"
+        src: "{{ test_file }}"
       delegate_to: localhost
       run_once: true
       register: file_content
 
-    - debug:
+    - name: Print file content
+      debug:
         msg: "{{ file_content.content | b64decode }}"
+      delegate_to: localhost
+      run_once: true
