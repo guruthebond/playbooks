@@ -1,5 +1,5 @@
 ---
-- name: Capture and store job output to NFS
+- name: Capture and send logs to NFS
   hosts: all
   gather_facts: no
 
@@ -9,12 +9,14 @@
       shell: hostname
       register: result
 
-    - name: Write output directly to NFS (no aggregation)
+    - name: Write per-host output to NFS
       copy:
         content: |
+          =========================
           AWX JOB OUTPUT
           Job ID: {{ tower_job_id }}
           Host: {{ inventory_hostname }}
           Output: {{ result.stdout }}
+          =========================
         dest: "/mnt/awx-logs/job-{{ tower_job_id }}-{{ inventory_hostname }}.log"
       delegate_to: 10.1.0.80
