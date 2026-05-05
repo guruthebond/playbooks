@@ -1,12 +1,12 @@
 ---
-- name: Capture and save full job output to NFS
+- name: Capture and save job output to NFS
   hosts: localhost
   gather_facts: yes
   
   vars:
     nfs_base_path: "/var/log/awx-jobs"
     job_id: "{{ tower_job_id | default('manual') }}"
-    job_name: "{{ tower_job_template_name | default('unknown') }}"
+    job_name: "{{ tower_job_template_name | default('job') }}"
     job_output_file: "{{ nfs_base_path }}/{{ job_name }}/job_{{ job_id }}_complete_output.txt"
   
   tasks:
@@ -37,66 +37,100 @@
           ========================================
     
     # ============================================
-    # 3. Add system information (simplified)
+    # 3. Add environment info (works in EE)
     # ============================================
-    - name: Add system info to output
+    - name: Add environment info
       lineinfile:
         path: "{{ job_output_file }}"
         line: |
           
-          --- SYSTEM INFORMATION ---
+          --- ENVIRONMENT INFORMATION ---
           Hostname: {{ ansible_hostname }}
           OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
-          Kernel: {{ ansible_kernel }}
-          Architecture: {{ ansible_architecture }}
-          CPU: {{ ansible_processor_cores }} cores
-          Memory: {{ ansible_memtotal_mb }} MB
+          Python Version: {{ ansible_python_version }}
+          Ansible Version: {{ ansible_version.full }}
+          AWX Job ID: {{ job_id }}
         insertafter: EOF
     
     # ============================================
-    # 4. Execute your main tasks
+    # 4. Execute your main tasks using shell commands
     # ============================================
-    - name: Execute main job tasks
+    - name: Execute job tasks
       block:
-        # ADD YOUR ACTUAL TASKS HERE
-        - name: Example Task 1 - Check uptime
-          command: uptime
-          register: uptime_output
+        # Use shell commands that work in EE container
+        - name: Task 1 - Get current date and time
+          shell: |
+            echo "Current date and time"
+            date
+            echo "Timezone: $(cat /etc/timezone 2>/dev/null || echo 'UTC')"
+          register: datetime_output
+          ignore_errors: yes
         
-        - name: Add uptime to output
+        - name: Add datetime info
           lineinfile:
             path: "{{ job_output_file }}"
             line: |
               
-              --- TASK: System Uptime ---
-              {{ uptime_output.stdout }}
+              --- TASK 1: Date and Time ---
+              {{ datetime_output.stdout }}
             insertafter: EOF
         
-        - name: Example Task 2 - Check disk space
-          command: df -h
-          register: df_output
+        - name: Task 2 - Check Python version
+          command: python3 --version
+          register: python_version
+          ignore_errors: yes
         
-        - name: Add disk info to output
+        - name: Add Python info
           lineinfile:
             path: "{{ job_output_file }}"
             line: |
               
-              --- TASK: Disk Usage ---
-              {{ df_output.stdout }}
+              --- TASK 2: Python Version ---
+              {{ python_version.stdout | default('Python version check failed') }}
             insertafter: EOF
         
-        # YOUR CUSTOM TASKS GO HERE
-        - name: Your custom task
+        - name: Task 3 - Check disk space in /tmp
+          shell: df -h /tmp
+          register: disk_space
+          ignore_errors: yes
+        
+        - name: Add disk info
+          lineinfile:
+            path: "{{ job_output_file }}"
+            line: |
+              
+              --- TASK 3: Disk Space (/tmp) ---
+              {{ disk_space.stdout }}
+            insertafter: EOF
+        
+        - name: Task 4 - List files in current directory
+          shell: ls -la /runner/project/
+          register: file_list
+          ignore_errors: yes
+        
+        - name: Add file listing
+          lineinfile:
+            path: "{{ job_output_file }}"
+            line: |
+              
+              --- TASK 4: Project Files ---
+              {{ file_list.stdout }}
+            insertafter: EOF
+        
+        # ========================================
+        # ADD YOUR CUSTOM TASKS HERE
+        # ========================================
+        - name: Your custom application logic
           debug:
-            msg: "Executing custom job logic"
+            msg: "Executing custom job logic for job {{ job_id }}"
           register: custom_output
         
-        - name: Add custom task output
+        - name: Add custom output
           lineinfile:
             path: "{{ job_output_file }}"
             line: |
               
-              --- TASK: Custom Job Logic ---
+              --- CUSTOM TASK: Application Logic ---
               {{ custom_output.msg }}
             insertafter: EOF
         
@@ -117,6 +151,7 @@
               
               --- JOB FAILED ---
               Error: {{ error_msg }}
+              Failed Task: {{ ansible_failed_task.name | default('Unknown') }}
             insertafter: EOF
     
     # ============================================
@@ -136,7 +171,7 @@
         insertafter: EOF
     
     # ============================================
-    # 6. Create summary file
+    # 6. Create summary files
     # ============================================
     - name: Create JSON summary
       copy:
@@ -157,3 +192,18 @@
         dest: "{{ nfs_base_path }}/{{ job_name }}/latest.txt"
         state: link
         force: yes
+    
+    # ============================================
+    # 7. Display summary
+    # ============================================
+    - name: Show job completion summary
+      debug:
+        msg: |
+          
+          ========================================
+          JOB {{ job_id }} COMPLETED
+          ========================================
+          Status: {{ job_status | default('SUCCESS') }}
+          Output: {{ job_output_file }}
+          Summary: {{ nfs_base_path }}/{{ job_name }}/job_{{ job_id }}_summary.json
+          ========================================
