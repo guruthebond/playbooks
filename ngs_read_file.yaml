@@ -1,0 +1,15 @@
+- name: Read file from NFS via execution node
+  hosts: all
+  gather_facts: no
+
+  tasks:
+
+    - name: Read hello.txt from NFS
+      slurp:
+        src: /mnt/awx-logs/hello.txt
+      delegate_to: 10.1.0.80
+      register: file_content
+
+    - name: Decode content
+      debug:
+        msg: "{{ file_content.content | b64decode }}"
