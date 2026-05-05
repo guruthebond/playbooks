@@ -19,4 +19,4 @@
           Output: {{ result.stdout }}
           =========================
         dest: "/mnt/awx-logs/job-{{ tower_job_id }}-{{ inventory_hostname }}.log"
-      delegate_to: 10.1.0.80
+      delegate_to: 10.1.0.77
