@@ -1,0 +1,26 @@
+---
+- name: Capture and store job output to NFS
+  hosts: all
+  gather_facts: no
+
+  tasks:
+
+    - name: Example command
+      shell: "hostname"
+      register: result
+
+    - name: Collect output
+      set_stats:
+        data:
+          job_log: "{{ (job_log | default('')) + '\n[' + inventory_hostname + '] ' + result.stdout }}"
+
+    - name: Write to NFS
+      copy:
+        content: |
+          AWX JOB OUTPUT
+          Job ID: {{ tower_job_id }}
+          =====================
+          {{ job_log }}
+        dest: "/mnt/awx-logs/job-{{ tower_job_id }}.log"
+      delegate_to: 10.1.0.80
+      run_once: true
