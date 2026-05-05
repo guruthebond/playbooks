@@ -4,7 +4,7 @@
   gather_facts: no
 
   vars:
-    test_file: "/mnt/awx-logs/awx-test-{{ inventory_hostname }}.txt"
+    test_file: "/var/log/awx-jobs/awx-test-{{ inventory_hostname }}.txt"
 
   tasks:
 
@@ -17,7 +17,7 @@
 
     - name: Check if NFS mount exists
       stat:
-        path: /mnt/awx-logs
+        path: /var/log/awx-jobs
       register: nfs_mount
 
     - debug:
@@ -25,7 +25,7 @@
 
     - name: Fail if NFS mount is missing
       fail:
-        msg: "/mnt/awx-logs is NOT mounted on execution node"
+        msg: "/var/log/awx-jobs is NOT mounted on execution node"
       when: not nfs_mount.stat.exists
 
     - name: Write test file to NFS
