@@ -1,22 +1,39 @@
 ---
-- name: Simple NFS write test
+- name: Find writable location
   hosts: localhost
   gather_facts: false
   
   tasks:
-    - name: Write test file using shell
-      shell: |
-        mkdir -p /var/log/awx-jobs/custom
-        echo "Test from AWX at $(date)" > /var/log/awx-jobs/custom/test.txt
-        echo "Job ID: {{ tower_job_id | default('N/A') }}" >> /var/log/awx-jobs/custom/test.txt
-        echo "User: $(whoami)" >> /var/log/awx-jobs/custom/test.txt
-        echo "UID: $(id -u)" >> /var/log/awx-jobs/custom/test.txt
-        echo "Success!" >> /var/log/awx-jobs/custom/test.txt
-        cat /var/log/awx-jobs/custom/test.txt
-      args:
-        executable: /bin/bash
-      register: result
-
-    - name: Show output
+    - name: Check who we are
+      command: id
+      register: user_id
+      changed_when: false
+    
+    - name: Show user info
       debug:
-        msg: "{{ result.stdout_lines }}"
+        msg: "{{ user_id.stdout }}"
+    
+    - name: List /var/log
+      command: ls -la /var/log/
+      register: var_log
+      changed_when: false
+    
+    - name: Show /var/log
+      debug:
+        msg: "{{ var_log.stdout_lines }}"
+    
+    - name: Try writing to /tmp first
+      copy:
+        content: "Test from AWX job at {{ ansible_date_time.iso8601 }}"
+        dest: /tmp/test-from-awx.txt
+    
+    - name: Try writing to /var/log/awx-jobs
+      copy:
+        content: "Test to awx-jobs"
+        dest: /var/log/awx-jobs/test.txt
+      ignore_errors: yes
+      register: test_write
+    
+    - name: Check if write succeeded
+      debug:
+        msg: "Write to /var/log/awx-jobs {{ 'succeeded' if test_write is not failed else 'failed' }}"
