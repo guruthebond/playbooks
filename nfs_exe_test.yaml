@@ -1,37 +1,15 @@
 ---
-- name: Write directly to NFS
+- name: Write to NFS via execution node
   hosts: all
-  become: yes
   gather_facts: no
 
   tasks:
 
-    - name: Install NFS client (if missing)
-      package:
-        name: nfs-utils
-        state: present
-      delegate_to: localhost
-      run_once: true
-
-    - name: Create mount point
-      file:
-        path: /mnt/nfs
-        state: directory
-      delegate_to: localhost
-      run_once: true
-
-    - name: Mount NFS share
-      mount:
-        path: /mnt/nfs
-        src: 10.1.0.100:/home/gtb/share_dir
-        fstype: nfs
-        state: mounted
-      delegate_to: localhost
-      run_once: true
-
-    - name: Write file to NFS
+    - name: Write file to NFS through exe01
       copy:
-        content: "Hello from AWX job {{ inventory_hostname }}"
-        dest: "/mnt/nfs/job-{{ inventory_hostname }}.txt"
-      delegate_to: localhost
-      run_once: true
+        content: |
+          AWX NFS TEST
+          Inventory Host: {{ inventory_hostname }}
+          Job ID: {{ tower_job_id }}
+        dest: "/mnt/awx-logs/job-{{ inventory_hostname }}.txt"
+      delegate_to: exe01.gtb.lab
