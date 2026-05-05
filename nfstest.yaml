@@ -7,11 +7,21 @@
     output_dir: "/var/log/awx-jobs/custom"
 
   tasks:
+    - name: Check current user and permissions
+      command: whoami
+      register: current_user
+      changed_when: false
+
+    - name: Display current user
+      debug:
+        msg: "Running as user: {{ current_user.stdout }}"
+
     - name: Ensure custom directory exists
       file:
         path: "{{ output_dir }}"
         state: directory
-        mode: '0775'
+        mode: '0777'  # Changed to 0777 for testing
+      # Remove become: yes if present - the awx user already has permissions
 
     - name: Write test file to NFS
       copy:
@@ -23,6 +33,16 @@
           User: {{ tower_user_name | default('N/A') }}
           Time: {{ lookup('pipe', 'date') }}
           Host: {{ inventory_hostname }}
+        mode: '0644'
+
+    - name: List directory contents
+      command: ls -la "{{ output_dir }}"
+      register: dir_contents
+      changed_when: false
+
+    - name: Show directory contents
+      debug:
+        msg: "{{ dir_contents.stdout_lines }}"
 
     - name: Verify file exists
       stat:
@@ -32,4 +52,14 @@
     - name: Show result
       debug:
         msg: "File created successfully at {{ output_dir }}"
+      when: file_check.stat.exists
+
+    - name: Display file content
+      command: cat "{{ output_dir }}/job_{{ tower_job_id | default('manual') }}.txt"
+      register: file_content
+      when: file_check.stat.exists
+
+    - name: Show file content
+      debug:
+        msg: "{{ file_content.stdout_lines }}"
       when: file_check.stat.exists
