@@ -2,15 +2,22 @@
 - name: Write job output directly to NFS share
   hosts: localhost
   connection: local
-  gather_facts: no
+  gather_facts: false
 
   vars:
     job_id: "{{ tower_job_id | default(awx_job_id) | default('manual') }}"
 
   tasks:
+    - name: Check NFS path exists
+      command: ls -ld /nfs/novashare
+      register: nfs_check
+
+    - name: Show NFS path
+      debug:
+        var: nfs_check.stdout
 
     - name: Run command locally
-      shell: hostname
+      command: hostname
       register: result
 
     - name: Write job output to NFS
@@ -23,4 +30,4 @@
           Output: {{ result.stdout }}
           =========================
         dest: "/nfs/novashare/job-{{ job_id }}.log"
-        mode: '0644'
+        mode: "0644"
