@@ -1,0 +1,26 @@
+---
+- name: Write job output directly to NFS share
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars:
+    job_id: "{{ tower_job_id | default(awx_job_id) | default('manual') }}"
+
+  tasks:
+
+    - name: Run command locally
+      shell: hostname
+      register: result
+
+    - name: Write job output to NFS
+      copy:
+        content: |
+          =========================
+          AWX JOB OUTPUT
+          Job ID: {{ job_id }}
+          Host: {{ inventory_hostname }}
+          Output: {{ result.stdout }}
+          =========================
+        dest: "/nfs/novashare/job-{{ job_id }}.log"
+        mode: '0644'
