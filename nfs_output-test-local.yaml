@@ -1,46 +1,24 @@
 ---
-- name: "Write job output directly to NFS share"
-  hosts: localhost
-  connection: local
-  gather_facts: false
-
-  vars:
-    nfs_path: "/nfs/novashare"
-    job_id: "{{ tower_job_id | default(awx_job_id) | default('manual') }}"
+- name: "Write job output to NFS server using delegate"
+  hosts: all
+  gather_facts: falsex_job_id) | default('manual') }}"  gather_facts: false
 
   tasks:
-    - name: "Show current user and path info"
-      shell: |
-        id
-        hostname
-        pwd
-        ls -ld /nfs || true
-        ls -ld {{ nfs_path }} || true
-        mount | grep -i nfs || true
-      register: env_check
-      changed_when: false
+    - name: "Run command on target host"
+      command: hostname
+      register: result
 
-    - name: "Print environment check"
-      debug:
-        var: env_check.stdout_lines
-
-    - name: "Check NFS path exists"
-      stat:
-        path: "{{ nfs_path }}"
-      register: nfs_stat
-
-    - name: "Fail if NFS path is not mounted inside AWX job container"
-      fail:
-        msg: "{{ nfs_path }} is not visible inside AWX job execution container."
-      when: not nfs_stat.stat.exists
-
-    - name: "Write test output to NFS"
+    - name: "Write per-host output to NFS server"
       copy:
         content: |
           =========================
           AWX JOB OUTPUT
           Job ID: {{ job_id }}
-          Host: {{ inventory_hostname }}
+          Target Host: {{ inventory_hostname }}
+          Command Output: {{ result.stdout }}
           =========================
-        dest: "{{ nfs_path }}/job-{{ job_id }}.log"
+        dest: "/nfs/novashare/job-{{ job_id }}-{{ inventory_hostname }}.log"
         mode: "0644"
+      delegate_to: "63.136.253.17"
+
+  vars:
