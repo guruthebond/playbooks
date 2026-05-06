@@ -1,0 +1,83 @@
+---
+- name: "Write job output directly to NFS via delegate host"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    nfs_delegate_host: "63.136.253.17"
+    nfs_base_path: "/nfs/novashare"
+    job_output_sub_path: "job-output"
+    job_output_dir: "{{ nfs_base_path }}/{{ job_output_sub_path }}"
+    job_id: "{{ tower_job_id | default(awx_job_id) | default('manual') }}"
+
+  pre_tasks:
+    - name: "Capture delegated host mount diagnostics"
+      ansible.builtin.shell:
+        cmd: |
+          echo "runtime_host=$(hostname)"
+          echo "pwd=$(pwd)"
+          echo "user=$(id)"
+          ls -ld /nfs || true
+          ls -ld /nfs/novashare || true
+          mount | grep novashare || true
+      register: runtime_mount_diagnostics
+      changed_when: false
+      delegate_to: "{{ nfs_delegate_host }}"
+
+    - name: "Display delegated host mount diagnostics"
+      ansible.builtin.debug:
+        msg: "{{ runtime_mount_diagnostics.stdout_lines }}"
+
+    - name: "Check whether NFS storage is visible on delegate host"
+      ansible.builtin.stat:
+        path: "{{ nfs_base_path }}"
+      register: novashare_mount
+      delegate_to: "{{ nfs_delegate_host }}"
+
+    - name: "Fail when delegate host cannot see NFS mount"
+      ansible.builtin.fail:
+        msg: >-
+          {{ nfs_base_path }} is not visible on delegated host {{ nfs_delegate_host }}.
+          Check the runtime diagnostics above from the AWX job output.
+      when: not novashare_mount.stat.exists
+
+  tasks:
+    - name: "Run command locally inside AWX job container"
+      ansible.builtin.command: hostname
+      register: result
+      changed_when: false
+
+    - name: "Ensure output directory exists on delegate host"
+      ansible.builtin.file:
+        path: "{{ job_output_dir }}"
+        state: directory
+        mode: "0755"
+      delegate_to: "{{ nfs_delegate_host }}"
+
+    - name: "Write output to NFS on delegate host"
+      ansible.builtin.copy:
+        content: |
+          =========================
+          AWX JOB OUTPUT
+          Job ID: {{ job_id }}
+          Source Host: {{ result.stdout }}
+          Delegate Host: {{ nfs_delegate_host }}
+          Output Directory: {{ job_output_dir }}
+          =========================
+        dest: "{{ job_output_dir }}/job-{{ job_id }}-{{ result.stdout }}.log"
+        mode: "0644"
+      delegate_to: "{{ nfs_delegate_host }}"
+
+    - name: "Validate output file exists on delegate host"
+      ansible.builtin.stat:
+        path: "{{ job_output_dir }}/job-{{ job_id }}-{{ result.stdout }}.log"
+      register: output_file_status
+      delegate_to: "{{ nfs_delegate_host }}"
+
+    - name: "Display resolved output path"
+      ansible.builtin.debug:
+        msg: >-
+          Wrote job output to {{ job_output_dir }}/job-{{ job_id }}-{{ result.stdout }}.log
+          via {{ nfs_delegate_host }}.
+          File exists: {{ output_file_status.stat.exists }}
